@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classical Turing Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Courier Prime', monospace; background-color: #f4ede3; }
+        .paper { background-color: #ffffff; border: 2px solid #333; box-shadow: 6px 6px 0px 0px rgba(0,0,0,1); }
+        .tape-cell {
+            min-width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;
+            border: 2px solid #333; font-weight: bold; background-color: #fff;
+        }
+        .tape-cell.active { background-color: #333; color: #fff; border-color: #333; }
+        .btn-retro {
+            border: 2px solid #333; background: #fff; padding: 0.5rem 1rem;
+            box-shadow: 3px 3px 0px 0px #333; transition: all 0.1s;
+        }
+        .btn-retro:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px 0px #333; }
+        .console-area { background: #1a1a1a; color: #00ff41; border: 2px solid #000; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-3xl mx-auto space-y-8">
+        <header class="text-center pb-4 border-b-4 border-dashed border-stone-400">
+            <h1 class="text-4xl font-bold uppercase tracking-widest text-stone-900">Turing Engine</h1>
+            <p class="mt-2 text-stone-600 uppercase text-sm">Model: Automaton Type-1</p>
+        </header>
+
+        <div class="paper p-6">
+            <h2 class="text-lg font-bold mb-4 uppercase underline">1. Instructions</h2>
+            <ul class="text-sm space-y-1 mb-4 opacity-80">
+                <li>• Define rules line-by-line: "STATE READ > WRITE MOVE NEXT_STATE"</li>
+                <li>• Example: "q0 0 > 1 R q0" (Move R: Right, L: Left, S: Stay)</li>
+                <li>• Set initial state and tape below.</li>
+            </ul>
+            <textarea id="programInput" class="w-full h-48 p-4 bg-stone-100 border-2 border-stone-300 outline-none focus:border-stone-800" spellcheck="false" placeholder="q0 0 > 1 R q0&#10;q0 1 > 0 R q0&#10;q0 _ > _ S halt"></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="paper p-6">
+                <label class="block text-sm font-bold uppercase mb-2">2. Initial State</label>
+                <input id="initialStateInput" type="text" value="q0" class="w-full p-2 border-2 border-stone-300 mb-4">
+                
+                <label class="block text-sm font-bold uppercase mb-2">3. Initial Tape</label>
+                <input id="tapeInput" type="text" value="10110" class="w-full p-2 border-2 border-stone-300 mb-4">
+                
+                <button onclick="loadMachine()" class="btn-retro w-full font-bold uppercase">Load Program</button>
+            </div>
+
+            <div class="paper p-6 flex flex-col justify-center">
+                <div class="text-center">
+                    <p class="text-sm opacity-60 uppercase">Current State</p>
+                    <div id="stateDisplay" class="text-2xl font-bold">-</div>
+                </div>
+                <div class="mt-4 text-center">
+                    <p class="text-sm opacity-60 uppercase">Step Count</p>
+                    <div id="stepDisplay" class="text-2xl font-bold">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="paper p-8 overflow-hidden">
+            <div id="tapeContainer" class="flex justify-center items-center gap-2"></div>
+            
+            <div class="flex justify-center gap-4 mt-8">
+                <button onclick="step()" class="btn-retro">STEP</button>
+                <button onclick="toggleAuto()" id="autoBtn" class="btn-retro">AUTO</button>
+                <button onclick="resetMachine()" class="btn-retro">RESET</button>
+            </div>
+        </div>
+
+        <div id="console" class="console-area p-4 h-32 overflow-y-auto text-xs">
+            > Ready to compile.
+        </div>
+    </div>
+
+    <script>
+        let tape = {};
+        let head = 0;
+        let state = 'q0';
+        let program = {};
+        let stepCount = 0;
+        let autoPlay = null;
+
+        function log(msg) {
+            const c = document.getElementById('console');
+            c.innerHTML += `<div>> ${msg}</div>`;
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function loadMachine() {
+            try {
+                const text = document.getElementById('programInput').value;
+                const lines = text.split('\n');
+                const newProgram = {};
+
+                lines.forEach(line => {
+                    const parts = line.trim().split(/\s+/);
+                    if (parts.length < 6) return; 
+                    const [st, read, arrow, write, move, nextSt] = parts;
+                    if (!newProgram[st]) newProgram[st] = {};
+                    let moveVal = (move === 'R') ? 1 : (move === 'L' ? -1 : 0);
+                    newProgram[st][read] = { write, move: moveVal, nextState: nextSt };
+                });
+                program = newProgram;
+                resetMachine();
+                log("Program loaded successfully.");
+            } catch (e) { log("Error: " + e.message); }
+        }
+
+        function resetMachine() {
+            const input = document.getElementById('tapeInput').value;
+            const startState = document.getElementById('initialStateInput').value;
+            tape = {};
+            for(let i=0; i<input.length; i++) tape[i] = input[i];
+            head = 0;
+            state = startState;
+            stepCount = 0;
+            updateUI();
+            log("System Reset. State: " + state);
+        }
+
+        function updateUI() {
+            const container = document.getElementById('tapeContainer');
+            container.innerHTML = '';
+            for(let i = head - 3; i <= head + 3; i++) {
+                const cell = document.createElement('div');
+                cell.className = `tape-cell ${i === head ? 'active' : ''}`;
+                cell.textContent = tape[i] || '_';
+                container.appendChild(cell);
+            }
+            document.getElementById('stateDisplay').textContent = state;
+            document.getElementById('stepDisplay').textContent = stepCount;
+        }
+
+        function step() {
+            if (state === 'halt') return;
+            const char = tape[head] || '_';
+            const action = program[state] ? program[state][char] : null;
+            if (!action) {
+                log(`Halt: No transition for state ${state}, char ${char}`);
+                state = 'halt';
+                updateUI();
+                return;
+            }
+            tape[head] = action.write;
+            state = action.nextState;
+            head += action.move;
+            stepCount++;
+            updateUI();
+        }
+
+        function toggleAuto() {
+            if (autoPlay) {
+                clearInterval(autoPlay);
+                autoPlay = null;
+                document.getElementById('autoBtn').textContent = "AUTO";
+            } else {
+                autoPlay = setInterval(step, 400);
+                document.getElementById('autoBtn').textContent = "STOP";
+            }
+        }
+
+        // Initialize default view
+        document.getElementById('programInput').value = `q0 0 > 1 R q0
+q0 1 > 0 R q0
+q0 _ > _ S halt`;
+        loadMachine();
+    </script>
+</body>
+</html>
