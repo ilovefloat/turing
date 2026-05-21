@@ -40,7 +40,7 @@
                 <h2 class="text-lg font-bold uppercase underline">. Commands</h2>
                 <button onclick="toggleHelpModal(true)" class="btn-retro w-7 h-7 p-0 font-bold text-sm" title="Instructions">?</button>
             </div>
-            <textarea id="programInput" class="w-full h-48 p-4 bg-stone-100 border-2 border-stone-300 outline-none focus:border-stone-800 font-mono text-sm leading-relaxed" spellcheck="false"></textarea>
+            <textarea id="programInput" class="w-full h-48 p-4 bg-stone-100 border-2 border-stone-300 outline-none focus:border-stone-800 font-mono text-sm leading-relaxed" spellcheck="false" placeholder="q0 0 > 1 R q0&#10;q0 1 > 0 R q0&#10;q0 _ > _ S halt"></textarea>
         </div>
 
         <!-- 2. Configuration & 3. Telemetry Grid -->
@@ -84,8 +84,8 @@
         <!-- 4. Tape Viewport Box -->
         <div class="paper p-6 overflow-hidden">
             <h2 class="text-lg font-bold mb-4 uppercase underline">. Tape Viewport</h2>
-            <!-- Tape view showing head and 7 positions to left & right (15 cells total) -->
-            <div id="tapeContainer" class="flex justify-start md:justify-center items-center gap-1 overflow-x-auto py-2"></div>
+            <!-- Tape container with relative positioning and scrolling capabilities -->
+            <div id="tapeContainer" class="flex justify-start items-center gap-1 overflow-x-auto py-4 px-2 scroll-smooth relative"></div>
             
             <div class="flex flex-wrap justify-center gap-4 mt-8">
                 <!-- Step Back -->
@@ -204,12 +204,29 @@
             const container = document.getElementById('tapeContainer');
             container.innerHTML = '';
             
-            // Displays 15 tape cells total: 7 to the left, current active, and 7 to the right
-            for(let i = head - 7; i <= head + 7; i++) {
+            // Get all indices that have data written to them
+            const keys = Object.keys(tape).map(Number);
+            
+            // Determine active bounds including BOTH the head position and all loaded tape values
+            const minIndex = keys.length ? Math.min(...keys, head) : head;
+            const maxIndex = keys.length ? Math.max(...keys, head) : head;
+            
+            // Add static padding to the left and right to allow smooth scrolling past the ends
+            const padding = 5;
+            const start = minIndex - padding;
+            const end = maxIndex + padding;
+            
+            let activeCellElement = null;
+
+            for(let i = start; i <= end; i++) {
                 const cell = document.createElement('div');
                 cell.className = `tape-cell ${i === head ? 'active' : ''}`;
                 cell.textContent = tape[i] || '_';
                 container.appendChild(cell);
+
+                if (i === head) {
+                    activeCellElement = cell;
+                }
             }
             
             document.getElementById('stateDisplay').textContent = state;
@@ -220,6 +237,18 @@
             
             // Lock out the step forward (>) button completely if machine is in halt state
             document.getElementById('stepBtn').disabled = (state === 'halt');
+
+            // Scroll active cell into view smoothly inside the local tape container ONLY
+            if (activeCellElement) {
+                const containerWidth = container.clientWidth;
+                const cellOffsetLeft = activeCellElement.offsetLeft;
+                const cellWidth = activeCellElement.clientWidth;
+                
+                container.scrollTo({
+                    left: cellOffsetLeft - (containerWidth / 2) + (cellWidth / 2),
+                    behavior: 'smooth'
+                });
+            }
         }
 
         function step() {
@@ -306,3 +335,4 @@ q0 _ > _ S halt`;
     </script>
 </body>
 </html>
+
