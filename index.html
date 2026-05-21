@@ -8,11 +8,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        html { overflow-anchor: none; } /* Prevents browser scroll-anchoring jumps when console appends text */
         body { font-family: 'Courier Prime', monospace; background-color: #f4ede3; }
         .paper { background-color: #ffffff; border: 2px solid #333; box-shadow: 6px 6px 0px 0px rgba(0,0,0,1); }
         .tape-cell {
-            min-width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
-            border: 2px solid #333; font-weight: bold; background-color: #fff; font-size: 0.9rem;
+            width: 40px; min-width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+            border: 2px solid #333; font-weight: bold; background-color: #fff; font-size: 0.9rem; flex-shrink: 0;
         }
         .tape-cell.active { background-color: #333; color: #fff; border-color: #333; }
         .btn-retro {
@@ -22,10 +23,10 @@
         }
         .btn-retro:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0px 0px #333; }
         .btn-retro:disabled { opacity: 0.5; cursor: not-allowed; }
-        .console-area { background: #1a1a1a; color: #00ff41; border: 2px solid #000; }
+        .console-area { background: #1a1a1a; color: #00ff41; border: 2px solid #000; contain: layout; }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="p-4 md:p-8 min-h-screen">
 
     <div class="max-w-3xl mx-auto space-y-8">
         <header class="text-center pb-4 border-b-4 border-dashed border-stone-400">
@@ -39,7 +40,7 @@
                 <h2 class="text-lg font-bold uppercase underline">. Commands</h2>
                 <button onclick="toggleHelpModal(true)" class="btn-retro w-7 h-7 p-0 font-bold text-sm" title="Instructions">?</button>
             </div>
-            <textarea id="programInput" class="w-full h-48 p-4 bg-stone-100 border-2 border-stone-300 outline-none focus:border-stone-800 font-mono text-sm leading-relaxed" spellcheck="false" placeholder="q0 0 > 1 R q0&#10;q0 1 > 0 R q0&#10;q0 _ > _ S halt"></textarea>
+            <textarea id="programInput" class="w-full h-48 p-4 bg-stone-100 border-2 border-stone-300 outline-none focus:border-stone-800 font-mono text-sm leading-relaxed" spellcheck="false"></textarea>
         </div>
 
         <!-- 2. Configuration & 3. Telemetry Grid -->
@@ -101,7 +102,7 @@
                 </button>
                 
                 <!-- Step Forward -->
-                <button onclick="step()" id="stepBtn" class="btn-retro px-6 font-bold text-lg h-11" title="Step Forward">&gt;</button>
+                <button onclick="stepBtnClicked()" id="stepBtn" class="btn-retro px-6 font-bold text-lg h-11" title="Step Forward">&gt;</button>
                 
                 <!-- Reset -->
                 <button onclick="resetMachine()" class="btn-retro uppercase font-bold h-11" title="Reset Machine">RESET</button>
@@ -257,6 +258,11 @@
                 log("Transitioned to terminal state 'halt'. Exit Code: 0 (Success)");
                 if (autoPlay) toggleAuto();
             }
+        }
+
+        // Wrapper function to preserve inline step button binding cleanly
+        function stepBtnClicked() {
+            step();
         }
 
         function stepBack() {
